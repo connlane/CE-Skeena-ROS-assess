@@ -3,7 +3,9 @@ DRAFT
 
 Changes this run: changed range to traverse the field, percent dictionary pairs (changed form len(list)-1 to len(list))
 
-TODOs:  TODO seperate steps into different try/except blocks TODO use variable during initial loop to store largest % area of ROS cat (save the list and dictionary BS later on) TODO improve comments and logging
+comment test
+
+TODOs:  TODO seperate steps into different try/except blocks TODO use variable during initial loop to store largest % area of ROS cat (save the list and dictionary later on) TODO improve comments and logging
 '''
 
 import os, time, arcpy, csv, logging, datetime # long list of dependencies
