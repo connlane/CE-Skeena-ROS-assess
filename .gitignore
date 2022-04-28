@@ -6,3 +6,5 @@ ARCHIVE_scripts/Skeena_ROS_summary_20220414.py
 ARCHIVE_scripts/Skeena_ROS_summary_20220420.py
 ARCHIVE_scripts/Skeena_ROS_summary_20220427.py
 ARCHIVE_scripts/Skeena_ROS_summary_20220422.py
+*.txt
+
