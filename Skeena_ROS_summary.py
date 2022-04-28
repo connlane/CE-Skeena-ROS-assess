@@ -15,7 +15,7 @@ import os, time, arcpy, csv, logging, datetime # long list of dependencies
     # print(os.path.abspath(os.path.join(__file__, os.pardir)))
 
 arcpy.env.overwriteOutput = True
-workspace = r'W:\srm\smt\Workarea\clane\SSAF_ESI\PeacefulEnjoyment\ArcProj\ROS.gdb'
+workspace = r''
 arcpy.env.workspace = workspace
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 log_tag = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
