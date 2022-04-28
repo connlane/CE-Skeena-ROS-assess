@@ -3,18 +3,27 @@ DRAFT
 
 Changes this run: changed range to traverse the field, percent dictionary pairs (changed form len(list)-1 to len(list))
 
-comment test
-
 TODOs:  TODO seperate steps into different try/except blocks TODO use variable during initial loop to store largest % area of ROS cat (save the list and dictionary later on) TODO improve comments and logging
+
+
+Copyright 2019 Province of British Columbia
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at 
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
 '''
 
 import os, time, arcpy, csv, logging, datetime # long list of dependencies
 
-
-# TODO set workspace needs to go up one directory from __file__ then into ArcProj\ROS.gdb
-    # print(os.path.abspath(os.path.join(__file__, os.pardir)))
-
-arcpy.env.overwriteOutput = True
 
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Run the assessment using the csv containing the layer names in ROS_assessment.gdb
@@ -28,6 +37,7 @@ with open(layers, 'r') as table: # read the csv
         paths_dict[k]=v
 workspace = paths_dict['workspace']
 arcpy.env.workspace = workspace
+arcpy.env.overwriteOutput = True
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 log_tag = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
 log_file = os.path.join(os.path.dirname(__file__), 'LogFile_{}.log'.format(log_tag))
@@ -140,10 +150,8 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
     #     print('\nUnable to complete greatest area ROS category assignment for assessment watershed')
     #     print(arcpy.GetMessages())
     #     logging.error(arcpy.GetMessages())
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Call the function on the layers        
+# Call the function on the layers from paths_dict        
 ROS_summary(paths_dict['area'], paths_dict['ROS'], paths_dict['fwa'])
 
 # TODO Jesse thinks it might work to use a list par inside a Tuple instead of the dictionary mess
