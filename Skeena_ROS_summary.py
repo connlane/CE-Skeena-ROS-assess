@@ -15,7 +15,18 @@ import os, time, arcpy, csv, logging, datetime # long list of dependencies
     # print(os.path.abspath(os.path.join(__file__, os.pardir)))
 
 arcpy.env.overwriteOutput = True
-workspace = r''
+
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Run the assessment using the csv containing the layer names in ROS_assessment.gdb
+layers = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ROS_layers.csv') # assumes the .csv is in the same folder as the script
+paths_dict = {} # the dictionary holds the layer's nickname and layer path from the CSV
+with open(layers, 'r') as table: # read the csv 
+    reader = csv.reader(table)
+    next(reader, None) # this skips the first row - the column names
+    for row in reader:
+        k, v = row
+        paths_dict[k]=v
+workspace = paths_dict['workspace']
 arcpy.env.workspace = workspace
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 log_tag = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
@@ -130,15 +141,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
     #     print(arcpy.GetMessages())
     #     logging.error(arcpy.GetMessages())
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Run the assessment using the csv containing the layer names in ROS_assessment.gdb
-layers = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ROS_layers.csv') # assumes the .csv is in the same folder as the script
-paths_dict = {} # the dictionary holds the layer's nickname and layer path from the CSV
-with open(layers, 'r') as table: # read the csv 
-    reader = csv.reader(table)
-    next(reader, None) # this skips the first row - the column names
-    for row in reader:
-        k, v = row
-        paths_dict[k]=v
+
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Call the function on the layers        
 ROS_summary(paths_dict['area'], paths_dict['ROS'], paths_dict['fwa'])
