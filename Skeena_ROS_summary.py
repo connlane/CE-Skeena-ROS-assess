@@ -33,7 +33,7 @@ with open(layers, 'r') as table: # read the csv
     reader = csv.reader(table)
     next(reader, None) # this skips the first row - the column names
     for row in reader:
-        k, v = row
+        k, v = row # CSV is laid out left to right: layer nickname (k) then layer path (v)
         paths_dict[k]=v
 workspace = paths_dict['workspace']
 arcpy.env.workspace = workspace
@@ -72,7 +72,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
         with arcpy.da.SearchCursor(ros_clip, ['REC_OPP_SPECTRUM_CODE']) as cursor:
             for row in cursor:
                 if row[0] not in category_list:
-                    category_list.append(row[0])
+                    category_list.append(row[0]) # Get the categories that exist within the ROI (no areas categorized as urban in Skeena region)
         print(category_list)
         outputs_list = []
         for cat in category_list: #Approx 40 seconds per iteration
@@ -96,9 +96,9 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
                 arcpy.management.Delete(out_sum)
                 del scursor, ucursor
             else:
-                print('No area overlap for {}'.format(out_sum))
+                print('No area overlap for {}'.format(out_sum)) 
                 logging.info('No area overlap for {}'.format(out_sum))
-                ucursor = arcpy.da.UpdateCursor(fwa_export, [field_ha, field_pct])
+                ucursor = arcpy.da.UpdateCursor(fwa_export, [field_ha, field_pct]) 
                 for row in ucursor:      
                     row[0] = 0.0
                     row[1] = 0.0
