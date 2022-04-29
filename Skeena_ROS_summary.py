@@ -48,13 +48,15 @@ logging.basicConfig(level=logging.DEBUG,
     filemode='a') #'a' appends to an existing file while 'w' overwrites anything already in the file
 logging.info('START LOGGING')
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# include function to check for presence of mines and adjust the field as required # TODO add optional additional check layers, add selection?
+# include function to check for presence of mines and adjust the field as required # TODO add optional additional check layers
+# function called near end of ROS_summary
 def mine_check(in_layer, in_field, in_val, in_check): # eg Pass to function: ROS output layer, field to update, value to set the field to, the mines layer to check for presence 
     check_name = in_check.rsplit('\\', 1)[-1]
+    check_name = check_name.rsplit('.', 1)[-1]
     print(check_name)
     new_layer = '{}_check_{}'.format(in_layer.rsplit('\\', 1)[-1], check_name) 
     print(new_layer)
-    arcpy.conversion.FeatureClassToFeatureClass(in_layer, workspace, new_layer)
+    arcpy.conversion.FeatureClassToFeatureClass(in_layer, workspace, new_layer) # make a new layer to preserve the results of ROS assessment
     if 'TRIM' in check_name:
         check_sel = arcpy.management.SelectLayerByAttribute(in_check, 'NEW_SELECTION', "FEATURE_TYPE IN ('mine', 'mineOpenPit', 'quarry')")
         check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', check_sel)
@@ -63,9 +65,10 @@ def mine_check(in_layer, in_field, in_val, in_check): # eg Pass to function: ROS
     print('Features to update: {}'.format(arcpy.management.GetCount(check_sel)))
     counter=0
     with arcpy.da.UpdateCursor(check_sel, [in_field]) as cursor:
-        counter+=1
-        row[0] = in_val # For each selected feature, change the field value to the input argument
-        cursor.updateRow(row)
+        for row in cursor:
+            counter+=1
+            row[0] = in_val # For each selected feature, change the field value to the input argument
+            cursor.updateRow(row)
     print('Num of features updated: {}'.format(counter))
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 def ROS_summary(in_aoi, in_ROS, in_AU):
