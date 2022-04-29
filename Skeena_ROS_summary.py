@@ -47,6 +47,26 @@ logging.basicConfig(level=logging.DEBUG,
     filename=log_file,
     filemode='a') #'a' appends to an existing file while 'w' overwrites anything already in the file
 logging.info('START LOGGING')
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# include function to check for presence of mines and adjust the field as required # TODO add optional additional check layers, add selection?
+def mine_check(in_layer, in_field, in_val, in_check): # eg Pass to function: ROS output layer, field to update, value to set the field to, the mines layer to check for presence 
+    check_name = in_check.rsplit('\\', 1)[-1]
+    print(check_name)
+    new_layer = '{}_check_{}'.format(in_layer.rsplit('\\', 1)[-1], check_name) 
+    print(new_layer)
+    arcpy.conversion.FeatureClassToFeatureClass(in_layer, workspace, new_layer)
+    if 'TRIM' in check_name:
+        check_sel = arcpy.management.SelectLayerByAttribute(in_check, 'NEW_SELECTION', "FEATURE_TYPE IN ('mine', 'mineOpenPit', 'quarry')")
+        check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', check_sel)
+    else:
+        check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', in_check)
+    print('Features to update: {}'.format(arcpy.management.GetCount(check_sel)))
+    counter=0
+    with arcpy.da.UpdateCursor(check_sel, [in_field]) as cursor:
+        counter+=1
+        row[0] = in_val # For each selected feature, change the field value to the input argument
+        cursor.updateRow(row)
+    print('Num of features updated: {}'.format(counter))
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 def ROS_summary(in_aoi, in_ROS, in_AU):
     tag = time.strftime("%y%m%d")
@@ -144,6 +164,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
     print(successcount)
     print(iteration)
     logging.info('{} of {} AUs assigned ROS category'.format(successcount, iteration))
+    mine_check(fwa_export, new_field, 'R', paths_dict['trim_mines'])
     arcpy.management.Delete(ros_clip)
     logging.info('FUNCTION COMPLETE')
     # except:
