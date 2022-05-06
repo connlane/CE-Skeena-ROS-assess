@@ -50,26 +50,28 @@ logging.info('START LOGGING')
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # include function to check for presence of mines and adjust the field as required # TODO add optional additional check layers
 # function called near end of ROS_summary
-def mine_check(in_layer, in_field, in_val, in_check): # eg Pass to function: ROS output layer, field to update, value to set the field to, the mines layer to check for presence 
-    check_name = in_check.rsplit('\\', 1)[-1]
-    check_name = check_name.rsplit('.', 1)[-1]
-    print(check_name)
-    new_layer = '{}_check_{}'.format(in_layer.rsplit('\\', 1)[-1], check_name) 
+def mine_check(in_layer, in_field, in_val, *in_check): # eg Pass to function: ROS assessment output layer, name of the field to update, value to set the field to, the mines layer to check for presence TODO add additional layers to check
+    new_layer = '{}_mine_adjuts'.format(in_layer.rsplit('\\', 1)[-1]) 
     print(new_layer)
     arcpy.conversion.FeatureClassToFeatureClass(in_layer, workspace, new_layer) # make a new layer to preserve the results of ROS assessment
-    if 'TRIM' in check_name:
-        check_sel = arcpy.management.SelectLayerByAttribute(in_check, 'NEW_SELECTION', "FEATURE_TYPE IN ('mine', 'mineOpenPit', 'quarry')")
-        check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', check_sel)
-    else:
-        check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', in_check)
-    print('Features to update: {}'.format(arcpy.management.GetCount(check_sel)))
-    counter=0
-    with arcpy.da.UpdateCursor(check_sel, [in_field]) as cursor:
-        for row in cursor:
-            counter+=1
-            row[0] = in_val # For each selected feature, change the field value to the input argument
-            cursor.updateRow(row)
-    print('Num of features updated: {}'.format(counter))
+    for mine in in_check:
+        # check_name = in_check.rsplit('\\', 1)[-1]
+        # check_name = check_name.rsplit('.', 1)[-1]
+        # print(check_name)
+        if 'TRIM' in mine:
+            check_sel = arcpy.management.SelectLayerByAttribute(mine, 'NEW_SELECTION', "FEATURE_TYPE IN ('mine', 'mineOpenPit', 'quarry')")
+            check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', check_sel)
+        else:
+            check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', mine)
+        print('Features to update: {}'.format(arcpy.management.GetCount(check_sel)))
+        counter=0
+        with arcpy.da.UpdateCursor(check_sel, [in_field]) as cursor:
+            for row in cursor:
+                if row[0] != in_val:
+                    row[0] = in_val # For each selected feature, change the field value to the input argument
+                cursor.updateRow(row)
+                counter+=1
+        print('Num of features updated: {}'.format(counter))
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 def ROS_summary(in_aoi, in_ROS, in_AU):
     tag = time.strftime("%y%m%d")
@@ -167,7 +169,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
     print(successcount)
     print(iteration)
     logging.info('{} of {} AUs assigned ROS category'.format(successcount, iteration))
-    mine_check(fwa_export, new_field, 'R', paths_dict['trim_mines'])
+    mine_check(fwa_export, new_field, 'R', paths_dict['trim_mines'], paths_dict['min_mines'])
     arcpy.management.Delete(ros_clip)
     logging.info('FUNCTION COMPLETE')
     # except:
