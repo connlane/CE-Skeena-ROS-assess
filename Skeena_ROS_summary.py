@@ -51,7 +51,7 @@ logging.info('START LOGGING')
 # include function to check for presence of mines and adjust the field as required # TODO add optional additional check layers
 # function called near end of ROS_summary
 def mine_check(in_layer, in_field, in_val, *in_check): # eg Pass to function: ROS assessment output layer, name of the field to update, value to set the field to, the mines layer to check for presence TODO add additional layers to check
-    new_layer = '{}_mine_adjuts'.format(in_layer.rsplit('\\', 1)[-1]) 
+    new_layer = '{}_mine_adjustment'.format(in_layer.rsplit('\\', 1)[-1]) 
     print(new_layer)
     arcpy.conversion.FeatureClassToFeatureClass(in_layer, workspace, new_layer) # make a new layer to preserve the results of ROS assessment
     for mine in in_check:
