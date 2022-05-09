@@ -101,6 +101,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
         print(category_list)
         outputs_list = []
         for cat in category_list: #Approx 40 seconds per iteration
+            print(cat)
             field_ha = '{}_Area_HA'.format(cat)
             field_pct = '{}_Area_PCNT'.format(cat)
             outputs_list.append(field_pct)
