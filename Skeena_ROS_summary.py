@@ -1,9 +1,9 @@
 '''
 DRAFT
 
-Changes this run: changed range to traverse the field, percent dictionary pairs (changed form len(list)-1 to len(list))
+Changes this branch: Add rules to group the AUs based on their predominant ROS categories, include a field in the mine_check section to store the unadjusted predominant ROS category
 
-TODOs:  TODO seperate steps into different try/except blocks TODO use variable during initial loop to store largest % area of ROS cat (save the list and dictionary later on) TODO improve comments and logging
+TODOs:  TODO seperate steps into different try/except blocks TODO improve comments and logging
 
 
 Copyright 2019 Province of British Columbia
@@ -54,6 +54,8 @@ def mine_check(in_layer, in_field, in_val, *in_check): # eg Pass to function: RO
     new_layer = '{}_mine_adjustment'.format(in_layer.rsplit('\\', 1)[-1]) 
     print(new_layer)
     arcpy.conversion.FeatureClassToFeatureClass(in_layer, workspace, new_layer) # make a new layer to preserve the results of ROS assessment
+    new_field = 'prev_ROS_code'
+    arcpy.management.AddField(new_layer, new_field, 'TEXT', field_is_nullable = True)
     for mine in in_check:
         # check_name = in_check.rsplit('\\', 1)[-1]
         # check_name = check_name.rsplit('.', 1)[-1]
@@ -65,9 +67,11 @@ def mine_check(in_layer, in_field, in_val, *in_check): # eg Pass to function: RO
             check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', mine)
         print('Features to update: {}'.format(arcpy.management.GetCount(check_sel)))
         counter=0
-        with arcpy.da.UpdateCursor(check_sel, [in_field]) as cursor:
+        with arcpy.da.UpdateCursor(check_sel, [in_field, new_field]) as cursor:
             for row in cursor:
                 if row[0] != in_val:
+                    row[1] = row[0] # set the new field attribute to the old ROS category before updating due to presence of a current or historical mine
+                    print(row[1])
                     row[0] = in_val # For each selected feature, change the field value to the input argument
                 cursor.updateRow(row)
                 counter+=1
@@ -171,6 +175,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
     print(iteration)
     logging.info('{} of {} AUs assigned ROS category'.format(successcount, iteration))
     mine_check(fwa_export, new_field, 'R', paths_dict['trim_mines'], paths_dict['min_mines'])
+    # ADD in the ROS groupings for both the original and mine_check layers
     arcpy.management.Delete(ros_clip)
     logging.info('FUNCTION COMPLETE')
     # except:
@@ -181,4 +186,4 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
 # Call the function on the layers from paths_dict        
 ROS_summary(paths_dict['area'], paths_dict['ROS'], paths_dict['fwa'])
 
-# TODO Jesse thinks it might work to use a list par inside a Tuple instead of the dictionary mess
+# TODO Jesse thinks it might work to use a list pair inside a Tuple instead of the dictionary mess? I fixed the problem with my dictionary because I was not terating through the full list length, just len()-1
