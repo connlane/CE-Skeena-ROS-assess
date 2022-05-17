@@ -40,7 +40,7 @@ arcpy.env.workspace = workspace
 arcpy.env.overwriteOutput = True
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 log_tag = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
-log_file = os.path.join(os.path.dirname(__file__), 'LogFile_{}.log'.format(log_tag))
+log_file = os.path.join(os.path.dirname(__file__), 'ROS_LogFile_{}.log'.format(log_tag))
 logging.basicConfig(level=logging.DEBUG,
     format='%(asctime)s:%(levelname)-4s:\t%(message)s',
     datefmt='%Y=%m-%d %H:%M:%S',
@@ -48,34 +48,56 @@ logging.basicConfig(level=logging.DEBUG,
     filemode='a') #'a' appends to an existing file while 'w' overwrites anything already in the file
 logging.info('START LOGGING')
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# include function to check for presence of mines and adjust the field as required # TODO add optional additional check layers
+# include function to check for presence of mines and adjust the field as required # TODO add an AU buffer of mines
 # function called near end of ROS_summary
-def mine_check(in_layer, in_field, in_val, *in_check): # eg Pass to function: ROS assessment output layer, name of the field to update, value to set the field to, the mines layer to check for presence TODO add additional layers to check
+def mine_check(in_layer, in_field, in_val, *in_check): # eg Pass to function: ROS assessment output layer, name of the field to update, value to set the field to, the mines layer to check for presence
     new_layer = '{}_mine_adjustment'.format(in_layer.rsplit('\\', 1)[-1]) 
     print(new_layer)
     arcpy.conversion.FeatureClassToFeatureClass(in_layer, workspace, new_layer) # make a new layer to preserve the results of ROS assessment
-    new_field = 'prev_ROS_code'
-    arcpy.management.AddField(new_layer, new_field, 'TEXT', field_is_nullable = True)
+    mine_aus = [] # add empty list of OIDs 
+    # TODO add the empty csv structure? want to save a summary table of all the AUs that contain mines
     for mine in in_check:
-        # check_name = in_check.rsplit('\\', 1)[-1]
-        # check_name = check_name.rsplit('.', 1)[-1]
-        # print(check_name)
-        if 'TRIM' in mine:
-            check_sel = arcpy.management.SelectLayerByAttribute(mine, 'NEW_SELECTION', "FEATURE_TYPE IN ('mine', 'mineOpenPit', 'quarry')")
-            check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', check_sel)
-        else:
-            check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', mine)
-        print('Features to update: {}'.format(arcpy.management.GetCount(check_sel)))
-        counter=0
-        with arcpy.da.UpdateCursor(check_sel, [in_field, new_field]) as cursor:
-            for row in cursor:
-                if row[0] != in_val:
-                    row[1] = row[0] # set the new field attribute to the old ROS category before updating due to presence of a current or historical mine
-                    print(row[1])
-                    row[0] = in_val # For each selected feature, change the field value to the input argument
-                cursor.updateRow(row)
-                counter+=1
-        print('Num of features updated: {}'.format(counter))
+        # if 'TRIM' in mine:
+            # check_sel = arcpy.management.SelectLayerByAttribute(mine, 'NEW_SELECTION', "FEATURE_TYPE IN ('mine', 'mineOpenPit', 'quarry')") # need to query the TRIM attributes
+            # check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'CONTAINS', check_sel) # TODO check the open/closed status
+        # else:
+        check_sel = arcpy.management.SelectLayerByLocation(new_layer, 'INTERSECT', mine, selection_type='ADD_TO_SELECTION') # using expanded mine selection
+        print('Features to update in {}: {}'.format(mine, arcpy.management.GetCount(check_sel))) # print the layer path and how many features were selected, 
+    new_field = 'prev_ROS_code' # add a field to store what the ROS code was before being changed to 'R'
+    arcpy.management.AddField(new_layer, new_field, 'TEXT', field_is_nullable = True) # field will be null for any AUs that do not have a mine. but what about those that are in the buffer?
+    counter=0
+    with arcpy.da.UpdateCursor(check_sel, [in_field, new_field]) as cursor: # change the AUs that have a mine in them to ROS code 'R'
+        for row in cursor:
+            if row[0] != in_val: # check that the ROS code actually needs to be changed, in_val = 'R', couldn't this be hard coded? yes, but should it?
+                row[1] = row[0] # set the new field attribute to the old ROS category before updating field due to presence of a current or historical mine
+                row[0] = in_val # For each selected feature, change the field value to the input argument
+            cursor.updateRow(row)
+            counter+=1
+    print(counter)
+    ROS_dict = {
+        1: 'R',
+        2: 'RM',
+        3: 'RN',
+        4: 'SPM',
+        5: 'SPNM',
+        6: 'P'
+    } # dictionary of the ROS codes assigned to an int in increasing order of recreation opportunity (ie higher the in, the 'better' the ROS code) 
+    print(arcpy.management.GetCount(check_sel))
+    boundary_sel = arcpy.management.SelectLayerByLocation(new_layer, "BOUNDARY_TOUCHES", check_sel)
+    print(arcpy.management.GetCount(boundary_sel))
+    boundary_sel = arcpy.management.SelectLayerByLocation(boundary_sel, 'ARE_IDENTICAL_TO', check_sel, selection_type='REMOVE_FROM_SELECTION') # remove the already adjusted feature from this seleciton
+    print(arcpy.management.GetCount(boundary_sel)) # second num of boundary_sel should be smaller since we have removed from the selection all the AUs that contain mines and have already been adjusted
+    with arcpy.da.UpdateCursor(boundary_sel, [in_field, new_field]) as cursor:
+        for row in cursor:
+            if not row[1]: # double check that we have not already adjusted this AU - if row[1] is not null, do the stuff
+                for num, code in ROS_dict.items(): # this nested for loop is not good practice. I'm not quite sure how else to get the key out of ROS_dict if it's not the item in the dict being evaluated
+                    if row[0] == code: # only 1 of the 6 items in the dict are necessary
+                        row[1] = row[0] # update the new_field to store what the previous ROS code was
+                        if num >= 2:
+                            row[0] =  ROS_dict[num-1] # set the predominant ROS code to the next worse code
+                        else:
+                            row[0] = ROS_dict[1]
+            cursor.updateRow(row)
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 def ROS_summary(in_aoi, in_ROS, in_AU):
     tag = time.strftime("%y%m%d")
@@ -148,7 +170,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
     # try:
     new_field = 'Predominant_ROS_Cat'
     arcpy.management.AddField(fwa_export, new_field, 'TEXT', field_is_nullable=True)
-    outputs_list.insert(0, new_field) # Can specify the index in list to insert the object using list.INSERT(). Unlike list.APPEND() which just tacks on the new object at the end
+    outputs_list.insert(0, new_field) # Can specify the index in list to insert the object using list.INSERT(index, element). Unlike list.APPEND() which just tacks on the new list element at the end
     print(outputs_list)
     successcount = 0
     iteration = 0
@@ -175,7 +197,6 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
     print(iteration)
     logging.info('{} of {} AUs assigned ROS category'.format(successcount, iteration))
     mine_check(fwa_export, new_field, 'R', paths_dict['trim_mines'], paths_dict['min_mines'])
-    # ADD in the ROS groupings for both the original and mine_check layers
     arcpy.management.Delete(ros_clip)
     logging.info('FUNCTION COMPLETE')
     # except:
