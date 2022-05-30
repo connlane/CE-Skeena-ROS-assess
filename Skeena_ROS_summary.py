@@ -200,6 +200,6 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
         logging.error(arcpy.GetMessages())
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Call the function on the layers from paths_dict        
-ROS_summary(paths_dict['area'], paths_dict['ROS'], paths_dict['fwa'])
+ROS_summary(paths_dict['AOI'], paths_dict['ROS'], paths_dict['AU'])
 
 # TODO Jesse thinks it might work to use a list pair inside a Tuple instead of the dictionary mess? Also put the CSV on github for others to see. I fixed the problem with my dictionary because I was not terating through the full list length, just len()-1

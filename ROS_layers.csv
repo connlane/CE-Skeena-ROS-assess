@@ -1,0 +1,7 @@
+Layer nickname (must be unique),File path
+workspace,Path to GDB
+AOI,Path to AOI layer
+ROS,Path to ROS layer
+AU,Path to assessment unit layer
+trim_mines,Path to a layer of mines (current or historic)
+min_mines,Path to a layer of mines (current or historic) - can include additional mines layers as long as 'mine' is in the unique nickname cell
