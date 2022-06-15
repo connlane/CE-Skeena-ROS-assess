@@ -32,24 +32,25 @@ logging.basicConfig(level=logging.DEBUG,
     filemode='a') #'a' appends to an existing file while 'w' overwrites anything already in the file
 logging.info('START LOGGING')
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Run the assessment using the csv containing the layer names in ROS_assessment.gdb
-layers = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ROS_layers.csv') # the CSV must be in the same folder as the script
-paths_dict = {} # the dictionary holds the layer's nickname and layer path from the CSV
-mines_list = []
+csv_name = 'ROS_layers.csv'
+layers = os.path.join(os.path.dirname(os.path.realpath(__file__)), csv_name) # the CSV must be in the same folder as the script
+paths_dict = {} # the dictionary holds the layer's nickname and file path from the CSV
+mines_list = [] # a list to hold the layers which will be used to check for the presence of mines
 with open(layers, 'r') as table: # read the csv 
     reader = csv.reader(table)
     next(reader, None) # this skips the first row - the column names
     for row in reader:
-        k, v = row # CSV is laid out left to right: layer nickname (k) then layer path (v)
-        paths_dict[k]=v
-        if 'mine' in k:
-            mines_list.append(v)
-            print(k, v)
+        a, b = row # CSV columns are laid out left to right: layer nickname (a) then layer path (b)
+        paths_dict[a]=b
+        if 'mine' in a: # check for keyword 'mine' in the nickname (column a of the csv)
+            mines_list.append(b)
+            print(a, b)           
 workspace = paths_dict['workspace']
 arcpy.env.workspace = workspace
 arcpy.env.overwriteOutput = True
 logging.info('CSV read successfully')
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # include function to check for presence of mines and adjust the field as required 
 # function called near end of ROS_summary
 def mine_check(in_layer, out_layer, in_field, in_dif: int, in_check: list): # eg Pass to function: ROS assessment output layer, name of the field to update, value to set the field to, the number of categories to change an AU neighboring a mine, the mines layer to check for presence
@@ -108,6 +109,7 @@ def mine_check(in_layer, out_layer, in_field, in_dif: int, in_check: list): # eg
                                 counter+=1
                         cursor.updateRow(row)
         logging.info('{} features updated for mines'.format(counter))
+        print('{} features updated for mines'.format(counter))
     except:
         print('Unable to complete mine_check function')
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -122,10 +124,6 @@ def hybrid_check(in_layer, out_layer, in_field, in_dif: int, in_check: list): # 
         arcpy.management.AddField(out_layer, new_field, 'TEXT', field_is_nullable = True) # field will be null for any AUs that do not have a mine or border an AU with a mine
         new_field2 = 'ROS_difference'
         arcpy.management.AddField(out_layer, new_field2, 'SHORT', field_is_nullable = True) 
-        with arcpy.da.UpdateCursor(out_layer, [new_field2]) as cursor:
-            for row in cursor:
-                row[0] = 0
-                cursor.updateRow(row)
         ROS_dict = { # dictionary of the ROS codes assigned to an int in increasing order of recreation opportunity (ie higher the key, the 'better' the ROS code)
             1: 'R',
             2: 'RM',
@@ -145,11 +143,8 @@ def hybrid_check(in_layer, out_layer, in_field, in_dif: int, in_check: list): # 
         counter = 0
         for mine in in_check:
             if 'TRIM' in mine:
-                print(arcpy.management.GetCount(mine)) # print the file path of the layer supplied to check for presence of current or historical mines
                 attr_sel = arcpy.management.SelectLayerByAttribute(mine, selection_type='NEW_SELECTION', where_clause="FEATURE_TYPE IN ('mine', 'mineOpenPit')")
-                print(arcpy.management.GetCount(attr_sel))
                 mine_sel = arcpy.management.SelectLayerByLocation(out_layer, 'INTERSECT', attr_sel, selection_type='NEW_SELECTION') # select the AU features that contain one of these mine features. These AUs and their neighbors need to be brought down by one code level
-                print(arcpy.management.GetCount(mine_sel))
                 with arcpy.da.UpdateCursor(mine_sel, [in_field, new_field, new_field2]) as cursor: # change the AUs that have a mine in them and their neighbors to ROS one ROS code lower
                     for row in cursor:
                         if not row[1]: # ensure that the feature has not already been updated
@@ -191,10 +186,11 @@ def hybrid_check(in_layer, out_layer, in_field, in_dif: int, in_check: list): # 
                                     counter+=1 
                             cursor.updateRow(row)
         logging.info('{} features updated'.format(counter))
+        print('{} features updated for hybrid adjustment'.format(counter))
     except:
         print('Unable to complete mine_check function')
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 def ROS_summary(in_aoi, in_ROS, in_AU):
     tag = time.strftime("%y%m%d")
     startTime = time.time()
@@ -214,25 +210,21 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
     # Do the ROS assessment
     try:
         ros_clip = 'ROS_{}_clip_{}'.format(area_name, tag)
-        arcpy.analysis.PairwiseClip(in_ROS, fwa_export, ros_clip) # don't clip to just the AOI as the AU selection will be a litle larger
-        category_list = [] # list of ROS categories
-        with arcpy.da.SearchCursor(ros_clip, ['REC_OPP_SPECTRUM_CODE']) as cursor:
-            for row in cursor:
-                if row[0] not in category_list:
-                    category_list.append(row[0]) # Get the categories that exist within the ROI (no areas categorized as urban in Skeena region)
+        arcpy.analysis.PairwiseClip(in_ROS, fwa_export, ros_clip) # clip the ROS to the copy of the AU layer
+        category_list = set([row[0] for row in arcpy.da.SearchCursor(ros_clip, ['REC_OPP_SPECTRUM_CODE'])]) # list of ROS categories using list comprehension
         outputs_list = []
         for cat in category_list: #Approx 40 seconds per iteration
             field_ha = '{}_Area_HA'.format(cat)
-            field_pct = '{}_Area_PCNT'.format(cat)
+            field_pct = '{}_Area_PCNT'.format(cat) # Add these fields for each category type
             outputs_list.append(field_pct)
             arcpy.management.AddField(fwa_export, field_ha, "FLOAT", field_is_nullable='TRUE')
             arcpy.management.AddField(fwa_export, field_pct, "FLOAT", field_is_nullable='TRUE')
             ros_sel = arcpy.management.SelectLayerByAttribute(ros_clip, 'NEW_SELECTION', """REC_OPP_SPECTRUM_CODE = '{}'""".format(cat))
-            if int(str(arcpy.management.GetCount(ros_sel))) > 0:
+            if int(str(arcpy.management.GetCount(ros_sel))) > 0: 
                 out_sum = r'FWA_AU_ROS_{}'.format(cat) #non static output name to be used later to update fwa_export
                 arcpy.analysis.SummarizeWithin(fwa_export, ros_sel, out_sum, 'KEEP_ALL', '', 'ADD_SHAPE_SUM', 'HECTARES')
                 scursor = [row[0] for row in arcpy.da.SearchCursor(out_sum, ("sum_Area_HECTARES"))]
-                ucursor = arcpy.da.UpdateCursor(fwa_export, ['AREA_HA', field_ha, field_pct])
+                ucursor = arcpy.da.UpdateCursor(fwa_export, ['AREA_HA', field_ha, field_pct]) # ucursor and scursor are the same length, so the update cursor in tandem with the search cursor works
                 i=0
                 for row in ucursor:      
                     row[1] = round(scursor[i], 2)
@@ -242,7 +234,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
                 arcpy.management.Delete(out_sum)
                 del scursor, ucursor
             else:
-                print('No area overlap for {}'.format(out_sum)) 
+                print('No area overlap for {}'.format(out_sum)) # Just in case that an entire ROS category is not in the AOI, can skip the steps and set the fields to 0
                 logging.info('No area overlap for {}'.format(out_sum))
                 ucursor = arcpy.da.UpdateCursor(fwa_export, [field_ha, field_pct]) 
                 for row in ucursor:      
@@ -290,7 +282,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
                 for field, pct in fields_dict.items():
                     if pct == search_val:
                         row[0] = field[:-10] # Assign the new_field to the ROS category that's the greatest % of the AU being evaluated. The entire field string is like 'RN_Area_PCNT', so slice off the last 10 chars to only have the ROS category code remaining
-                        row[1] = num_dict[field[:-10]]
+                        # row[1] = num_dict[field[:-10]]
                         successcount+=1
                         break
                     else:
@@ -311,6 +303,7 @@ def ROS_summary(in_aoi, in_ROS, in_AU):
         print('\nUnable to complete greatest area ROS category assignment for assessment watershed')
         print(arcpy.GetMessages())
         logging.error(arcpy.GetMessages())
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Call the function on the layers from paths_dict        
 ROS_summary(paths_dict['AOI'], paths_dict['ROS'], paths_dict['AU'])
